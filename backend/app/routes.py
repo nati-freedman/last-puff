@@ -1,6 +1,6 @@
-from app import app
 from flask import render_template, flash, redirect, url_for
-from forms import LoginForm
+from app import app
+from app.forms import LoginForm
 
 
 # Routes for all users: homepage, about, login/logout
