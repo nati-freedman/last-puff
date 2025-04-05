@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+    <head>
+      {% if title %}
+      <title>{{ title }} | LastPuff</title>
+      {% else %}
+      <title>Welcome to LastPuff</title>
+      {% endif %}
+    </head>
+    <body>
+        <div>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('about') }}">About</a>
+            {% if current_user.is_anonymous %}
+            <a href="{{ url_for('login') }}">Login</a>
+            {% else %}
+            <a href="{{ url_for('user_dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('user_feed') }}">Feed</a>
+            <a href="{{ url_for('logout') }}">Logout</a>
+            {% endif %}
+        </div>
+        <hr>
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <ul>
+            {% for message in messages %}
+            <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+        <hr>
+        {% block content %}{% endblock %}
+    </body>
+</html>
