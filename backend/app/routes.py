@@ -5,8 +5,8 @@ from flask import render_template, flash, redirect, url_for, request
 from flask_login import current_user, login_user, logout_user, login_required
 import sqlalchemy as sa
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, EditProfileForm, EmptyForm
-from app.models import User
+from app.forms import LoginForm, RegistrationForm, EditProfileForm, EmptyForm, PostForm
+from app.models import User, Post
 
 # Routes for all users: homepage, about, login/logout
 # Routes for logged in user: user dashboard, feed
@@ -57,11 +57,18 @@ def user_dashboard(username):
 
 # User feed page
 # TODO: CUSTOM URL
-@app.route('/feed/<username>')
+@app.route('/feed/<username>', methods=['GET', 'POST'])
 @login_required
 def user_feed(username):
     user = db.first_or_404(sa.select(User).where(User.username == username))
-    return render_template('feed.html', title='Feed', user=user)
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(body=form.post.data, author=current_user)
+        db.session.add(post)
+        db.session.commit()
+        flash('Your post is now live!')
+        return redirect(url_for('user_feed'))
+    return render_template('feed.html', title='Feed', user=user, form=form)
 
 # Registration page
 @app.route('/register',methods=['GET', 'POST'])
@@ -84,7 +91,7 @@ def register():
 def user(username):
     user = db.first_or_404(sa.select(User).where(User.username == username))
     form = EmptyForm()
-    return render_template('user.html', user=user, posts=posts, form=form)
+    return render_template('user.html', user=user, form=form)
 
 # Edit profile page
 @app.route('/edit_profile', methods=['GET', 'POST'])
