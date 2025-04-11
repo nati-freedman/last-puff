@@ -51,24 +51,48 @@ def logout():
 # TODO: CUSTOM TEMLPATE
 @app.route('/dashboard')
 @login_required
-def user_dashboard():
+def dashboard():
     return render_template('dashboard.html', title='Dashboard')
 
 # User feed page
 # TODO: CUSTOM TEMPLATE
 @app.route('/feed', methods=['GET', 'POST'])
 @login_required
-def user_feed():
+def feed():
     form = PostForm()
     if form.validate_on_submit():
         post = Post(body=form.post.data, author=current_user)
         db.session.add(post)
         db.session.commit()
         flash('Your post is now live!')
-        return redirect(url_for('user_feed'))
-    posts = db.session.scalars(current_user.following_posts()).all()
+        return redirect(url_for('feed'))
+    page = request.args.get('page', 1, type=int)
+    posts = db.paginate(current_user.following_posts(), page=page,
+                        per_page=app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('feed', page=posts.next_num) \
+        if posts.has_next else None
+    prev_url = url_for('feed', page=posts.prev_num) \
+        if posts.has_prev else None
     return render_template('feed.html', title='Feed',
-                           form=form, posts=posts)
+                           form=form, posts=posts.items,
+                           prev_url=prev_url, next_url=next_url)
+
+# Explore page, shows all posts
+@app.route('/explore')
+@login_required
+def explore():
+    page = request.args.get('page', 1, type=int)
+    query = sa.select(Post).order_by(Post.timestamp.desc())
+    posts = db.paginate(query, page=page,
+                        per_page=app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('explore', page=posts.next_num) \
+        if posts.has_next else None
+    prev_url = url_for('explore', page=posts.prev_num) \
+        if posts.has_prev else None
+    return render_template('feed.html', title='Explore', posts=posts.items,
+                           prev_url=prev_url, next_url=next_url)
 
 # Registration page
 @app.route('/register',methods=['GET', 'POST'])
@@ -158,11 +182,3 @@ def unfollow(username):
         return redirect(url_for('user', username=username))
     else:
         return redirect(url_for('index'))
-
-# Explore page, shows all posts
-@app.route('/explore')
-@login_required
-def explore():
-    query = sa.select(Post).order_by(Post.timestamp.desc())
-    posts = db.session.scalars(query).all()
-    return render_template('feed.html', title='Explore', posts=posts)
