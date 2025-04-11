@@ -5,8 +5,8 @@ from flask import render_template, flash, redirect, url_for, request
 from flask_login import current_user, login_user, logout_user, login_required
 import sqlalchemy as sa
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, EditProfileForm, EmptyForm
-from app.models import User
+from app.forms import LoginForm, RegistrationForm, EditProfileForm, EmptyForm, PostForm
+from app.models import User, Post
 
 # Routes for all users: homepage, about, login/logout
 # Routes for logged in user: user dashboard, feed
@@ -48,20 +48,51 @@ def logout():
     return redirect(url_for('index'))
 
 # User dashboard page
-# TODO: CUSTOM URL
-@app.route('/dashboard/<username>')
+# TODO: CUSTOM TEMLPATE
+@app.route('/dashboard')
 @login_required
-def user_dashboard(username):
-    user = db.first_or_404(sa.select(User).where(User.username == username))
-    return render_template('dashboard.html', title='Dashboard', user=user)
+def dashboard():
+    return render_template('dashboard.html', title='Dashboard')
 
 # User feed page
-# TODO: CUSTOM URL
-@app.route('/feed/<username>')
+# TODO: CUSTOM TEMPLATE
+@app.route('/feed', methods=['GET', 'POST'])
 @login_required
-def user_feed(username):
-    user = db.first_or_404(sa.select(User).where(User.username == username))
-    return render_template('feed.html', title='Feed', user=user)
+def feed():
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(body=form.post.data, author=current_user)
+        db.session.add(post)
+        db.session.commit()
+        flash('Your post is now live!')
+        return redirect(url_for('feed'))
+    page = request.args.get('page', 1, type=int)
+    posts = db.paginate(current_user.following_posts(), page=page,
+                        per_page=app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('feed', page=posts.next_num) \
+        if posts.has_next else None
+    prev_url = url_for('feed', page=posts.prev_num) \
+        if posts.has_prev else None
+    return render_template('feed.html', title='Feed',
+                           form=form, posts=posts.items,
+                           prev_url=prev_url, next_url=next_url)
+
+# Explore page, shows all posts
+@app.route('/explore')
+@login_required
+def explore():
+    page = request.args.get('page', 1, type=int)
+    query = sa.select(Post).order_by(Post.timestamp.desc())
+    posts = db.paginate(query, page=page,
+                        per_page=app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('explore', page=posts.next_num) \
+        if posts.has_next else None
+    prev_url = url_for('explore', page=posts.prev_num) \
+        if posts.has_prev else None
+    return render_template('feed.html', title='Explore', posts=posts.items,
+                           prev_url=prev_url, next_url=next_url)
 
 # Registration page
 @app.route('/register',methods=['GET', 'POST'])
@@ -83,8 +114,18 @@ def register():
 @login_required
 def user(username):
     user = db.first_or_404(sa.select(User).where(User.username == username))
+    page = request.args.get('page', 1, type=int)
+    query = user.posts.select().order_by(Post.timestamp.desc())
+    posts = db.paginate(query, page=page,
+                        per_page=app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('user', username=user.username, page=posts.next_num) \
+        if posts.has_next else None
+    prev_url = url_for('user', username=user.username, page=posts.prev_num) \
+        if posts.has_prev else None
     form = EmptyForm()
-    return render_template('user.html', user=user, posts=posts, form=form)
+    return render_template('user.html', user=user, posts=posts.items,
+                           prev_url=prev_url, next_url=next_url, form=form)
 
 # Edit profile page
 @app.route('/edit_profile', methods=['GET', 'POST'])

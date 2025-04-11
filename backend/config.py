@@ -20,3 +20,4 @@ class Config:
     MAIL_USERNAME = environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = environ.get('MAIL_PASSWORD')
     ADMINS = ['nati.frdmn@gmail.com']
+    POSTS_PER_PAGE = 2
